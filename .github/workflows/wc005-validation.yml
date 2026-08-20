@@ -30,7 +30,7 @@ jobs:
           
       - name: Start validation servers
         run: |
-          cd ${{ github.workspace }}/validation-kit
+          cd validation-kit
           python3 server.py --role attacker --port 8000 &
           python3 server.py --role victim --host 127.0.0.2 --port 8765 &
           sleep 3
@@ -38,7 +38,7 @@ jobs:
           
       - name: Run Playwright WebKit test
         run: |
-          cd ${{ github.workspace }}/validation-kit
+          cd validation-kit
           cat > test_wc005.py << 'PYEOF'
           import asyncio
           from playwright.async_api import async_playwright
@@ -78,7 +78,7 @@ jobs:
           
       - name: Collect results
         run: |
-          cat ${{ github.workspace }}/validation-kit/results.log
+          cat validation-kit/results.log
           
       - name: Upload results
         uses: actions/upload-artifact@v4
