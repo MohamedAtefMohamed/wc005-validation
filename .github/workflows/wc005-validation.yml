@@ -23,7 +23,6 @@ jobs:
           
       - name: Install dependencies
         run: |
-          # Use pipx for isolated Python apps (recommended on macOS)
           brew install pipx
           pipx ensurepath
           pipx install playwright
@@ -42,6 +41,12 @@ jobs:
           cd validation-kit
           cat > test_wc005.py << 'PYEOF'
           import asyncio
+          import sys
+          import os
+          # Add pipx bin to path
+          pipx_bin = os.path.expanduser("~/.local/bin")
+          if pipx_bin not in sys.path:
+              sys.path.insert(0, pipx_bin)
           from playwright.async_api import async_playwright
           
           async def main():
@@ -74,7 +79,8 @@ jobs:
           
           asyncio.run(main())
           PYEOF
-          python3 test_wc005.py
+          # Use pipx run to execute with playwright in path
+          ~/.local/bin/python3 test_wc005.py
           
       - name: Collect results
         run: |
