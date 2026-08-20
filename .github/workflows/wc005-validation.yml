@@ -23,9 +23,11 @@ jobs:
           
       - name: Install dependencies
         run: |
-          brew install python3
-          pip3 install --user playwright
-          python3 -m playwright install webkit
+          # Use pipx for isolated Python apps (recommended on macOS)
+          brew install pipx
+          pipx ensurepath
+          pipx install playwright
+          playwright install webkit
           
       - name: Start validation servers
         run: |
