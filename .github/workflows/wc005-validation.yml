@@ -16,11 +16,6 @@ jobs:
           ref: main
           path: WebKit
           
-      - name: Checkout validation kit
-        uses: actions/checkout@v4
-        with:
-          path: validation-kit
-          
       - name: Install dependencies
         run: |
           python3 -m venv venv
