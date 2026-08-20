@@ -16,6 +16,24 @@ jobs:
           ref: main
           path: WebKit
           
+      - name: Checkout validation kit repo
+        uses: actions/checkout@v4
+        with:
+          path: validation-kit-repo
+          
+      - name: Install dependencies
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install playwright
+          playwright install webkit
+          
+      - name: Set up validation kit
+        run: |
+          # Copy validation-kit from repo to workspace
+          cp -r validation-kit-repo/validation-kit ${{ github.workspace }}/validation-kit
+          ls -la ${{ github.workspace }}/validation-kit/
+          
       - name: Install dependencies
         run: |
           python3 -m venv venv
