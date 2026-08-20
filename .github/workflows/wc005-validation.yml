@@ -36,7 +36,7 @@ jobs:
           sleep 3
           curl -s http://127.0.0.2:8765/ | head -5
           
-      - name: Run Playwright WebKit test (headed with xvfb)
+      - name: Run Playwright WebKit test
         run: |
           cd validation-kit
           cat > test_wc005.py << 'PYEOF'
@@ -45,7 +45,7 @@ jobs:
           
           async def main():
               async with async_playwright() as p:
-                  # Use headed mode with xvfb for popup support
+                  # Use headed mode for popup support
                   browser = await p.webkit.launch(headless=False)
                   context = await browser.new_context()
                   page = await context.new_page()
@@ -74,8 +74,7 @@ jobs:
           
           asyncio.run(main())
           PYEOF
-          # Use xvfb-run for headed mode on headless CI
-          xvfb-run -a source ../venv/bin/activate && python test_wc005.py
+          source ../venv/bin/activate && python test_wc005.py
           
       - name: Collect results
         run: |
