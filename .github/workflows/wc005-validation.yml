@@ -21,13 +21,6 @@ jobs:
         with:
           path: validation-kit-repo
           
-      - name: Install dependencies
-        run: |
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install playwright
-          playwright install webkit
-          
       - name: Set up validation kit
         run: |
           # Copy validation-kit from repo to workspace
@@ -44,10 +37,11 @@ jobs:
       - name: Start validation servers
         run: |
           cd ${{ github.workspace }}/validation-kit
+          # Use localhost for both servers with different ports
           python3 server.py --role attacker --port 8000 &
-          python3 server.py --role victim --host 127.0.0.2 --port 8765 &
+          python3 server.py --role victim --host 127.0.0.1 --port 8765 &
           sleep 3
-          curl -s http://127.0.0.2:8765/ | head -5
+          curl -s http://127.0.0.1:8765/ | head -5
           
       - name: Run Playwright WebKit test
         run: |
